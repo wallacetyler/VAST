@@ -2,5 +2,6 @@ __pycache__/
 *.csv
 *.pyc
 vast_config.py
+env/
 venv/
 venv3/
