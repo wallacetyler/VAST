@@ -3,7 +3,7 @@ from pprint import pprint
 
 
 # Canvas API Key
-api_key = ''
+api_key = '1158~Bx1S5uoZ3gPIt4MCgkVkSIGNin1wpAdunFZ7rUC8cRCUzg9G2eWDMMCj9HYNpy5E'
 # Canvas URL e.g. https://example.instructure.com
 api_url = 'https://webcourses2c.test.instructure.com'
 
@@ -11,8 +11,31 @@ course_id = 1334463
 canvas = Canvas(api_url, api_key)
 course = canvas.get_course(course_id)
 
+class ResourceProvider:
+    def __init__(self, get_function, enabled = True):
+        self.get_function = get_function
+        self.enabled = enabled
+
+    def fetch(self):
+        if not self.enabled:
+            return
+        
+        resources = self.get_resources()
+        return resources
+
+    def get_resources(self):
+        raise NotImplementedError
+
+class PageService(ResourceProvider):
+    def get_resources(self):
+        pages = course.get_pages()
+        return pages
+
+RESOURCES = [
+    PageService(get_function = course.get_pages(), enabled = False)
+]
 """
-Resources:
+Resources in Canvas:
 - Pages
 - Assignments
 - Announcements
@@ -20,8 +43,6 @@ Resources:
 - Syllabus
 - Modules
 """
-resources = []
-
 class Resource:
     def __init__(self, id, full_url, content=None):
         self.id = id
@@ -56,16 +77,21 @@ class Syllabus(Resource):
     def get_content(self):
         pass
 
+"""
+Parser must be able to detect:
+- 
+"""
+class Parser():
+    
 
-syllabus = canvas.get_course(course_id, include='syllabus_body')
+resources = []
 
-def fetch_syllabus_content():
+def fetch_content():
     syllabus = canvas.get_course(course_id, include='syllabus_body')
     full_url = '{}/courses/{}/assignments/syllabus'.format(api_url, course_id)
     s = Syllabus(syllabus.id, full_url, syllabus.syllabus_body)
     resources.append(s)
 
-def fetch_modules_content():
     modules = course.get_modules()
     for module in modules:
         for item in module.get_module_items(include='content_details'):
@@ -73,34 +99,29 @@ def fetch_modules_content():
                 i = Module_Item(item.id, item.html_url, item.external_url)
                 resources.append(i)
 
-def fetch_page_content():
     for page in course.get_pages():
         p = Page(page.page_id, page.html_url, None, page.url)
         resources.append(p)
 
-def fetch_assignment_content():
     for assignment in course.get_assignments():
         a = Assignment(assignment.id, assignment.html_url, assignment.description)
         resources.append(a)
 
-def fetch_announcement_content():
     for announcement in course.get_discussion_topics(only_announcements=True):
         a = Announcement(announcement.id, announcement.html_url, announcement.message)
         resources.append(a)
 
-def fetch_discussion_content():
     for discussion in course.get_discussion_topics():
         d = Discussion(discussion.id, discussion.html_url, discussion.message)
         resources.append(d)
 
-fetch_syllabus_content()
-fetch_modules_content()
-fetch_page_content()
-fetch_assignment_content()
-fetch_announcement_content()
-fetch_discussion_content()
+fetch_content()
 
 for resource in resources:
     resource.get_content()
+    media, success = parser.parse_content(resource.content)
+
+    if success:
+        print(resource.full_url)
 
 import pdb; pdb.set_trace()
