@@ -1,15 +1,16 @@
 from canvasapi import Canvas
+from collections import namedtuple
 from pprint import pprint
 
-
 # Canvas API Key
-api_key = '1158~Bx1S5uoZ3gPIt4MCgkVkSIGNin1wpAdunFZ7rUC8cRCUzg9G2eWDMMCj9HYNpy5E'
+api_key = ''
 # Canvas URL e.g. https://example.instructure.com
 api_url = 'https://webcourses2c.test.instructure.com'
 
-course_id = 1334463
+course_id = 1346257
 canvas = Canvas(api_url, api_key)
 course = canvas.get_course(course_id)
+
 
 class ResourceProvider:
     def __init__(self, get_function, enabled = True):
@@ -26,102 +27,71 @@ class ResourceProvider:
     def get_resources(self):
         raise NotImplementedError
 
+
+class SyllabusService(ResourceProvider):
+    def get_resources(self):
+        syllabus = self.get_function(course_id, include='syllabus_body')
+        url = '{}/courses/{}/assignments/syllabus'.format(api_url, course_id)
+        return (syllabus.syllabus_body, url)
+
+
+class AnnouncementService(ResourceProvider):
+    def get_resources(self):
+        announcements = self.get_function(only_announcements=True)
+        content = []
+        for announcement in announcements:
+            content.append((announcement.message, announcement.html_url))
+        return content
+        
+
+class ModuleService(ResourceProvider):
+    def get_resources(self):
+        modules = self.get_function()
+        content = []
+        for module in modules:
+            for item in module.get_module_items(include='content_details'):
+                if item.type == 'ExternalUrl':
+                    content.append((item.external_url, item.html_url))
+        return content
+
+
+class AssignmentService(ResourceProvider):
+    def get_resources(self):
+        assignments = self.get_function()
+        content = []
+        for assignment in assignments:
+            content.append((assignment.description, assignment.html_url))
+        return content
+
+
+class DiscussionService(ResourceProvider):
+    def get_resources(self):
+        discussions = self.get_function()
+        content = []
+        for discussion in discussions:
+            content.append((discussion.message, discussion.html_url))
+        return content
+
+
 class PageService(ResourceProvider):
     def get_resources(self):
-        pages = course.get_pages()
-        return pages
+        pages = self.get_function()
+        content = []
+        for page in pages:
+            content.append((course.get_page(page.url), page.html_url))
+        return content
+
 
 RESOURCES = [
-    PageService(get_function = course.get_pages(), enabled = False)
+    SyllabusService(get_function = canvas.get_course, enabled = True),
+    AnnouncementService(get_function = course.get_discussion_topics, enabled = True),
+    ModuleService(get_function = course.get_modules, enabled = True),
+    AssignmentService(get_function = course.get_assignments, enabled = True),
+    DiscussionService(get_function = course.get_discussion_topics, enabled = True),
+    PageService(get_function = course.get_pages, enabled = True)
 ]
-"""
-Resources in Canvas:
-- Pages
-- Assignments
-- Announcements
-- Discussions
-- Syllabus
-- Modules
-"""
-class Resource:
-    def __init__(self, id, full_url, content=None):
-        self.id = id
-        self.full_url = full_url
-        self.content = content
 
-class Page(Resource):
-    def __init__(self, id, full_url, content=None, url=None):
-        self.url = url
-        Resource.__init__(self, id, full_url, content=None)
-
-    def get_content(self):
-        self.content = course.get_page(self.url)
-
-class Assignment(Resource):
-    def get_content(self):
-        pass
-
-class Announcement(Resource):
-    def get_content(self):
-        pass
-
-class Discussion(Resource):
-    def get_content(self):
-        pass
-
-class Module_Item(Resource):
-    def get_content(self):
-        pass
-
-class Syllabus(Resource):
-    def get_content(self):
-        pass
-
-"""
-Parser must be able to detect:
-- 
-"""
-class Parser():
-    
-
-resources = []
-
-def fetch_content():
-    syllabus = canvas.get_course(course_id, include='syllabus_body')
-    full_url = '{}/courses/{}/assignments/syllabus'.format(api_url, course_id)
-    s = Syllabus(syllabus.id, full_url, syllabus.syllabus_body)
-    resources.append(s)
-
-    modules = course.get_modules()
-    for module in modules:
-        for item in module.get_module_items(include='content_details'):
-            if item.type == 'ExternalUrl':
-                i = Module_Item(item.id, item.html_url, item.external_url)
-                resources.append(i)
-
-    for page in course.get_pages():
-        p = Page(page.page_id, page.html_url, None, page.url)
-        resources.append(p)
-
-    for assignment in course.get_assignments():
-        a = Assignment(assignment.id, assignment.html_url, assignment.description)
-        resources.append(a)
-
-    for announcement in course.get_discussion_topics(only_announcements=True):
-        a = Announcement(announcement.id, announcement.html_url, announcement.message)
-        resources.append(a)
-
-    for discussion in course.get_discussion_topics():
-        d = Discussion(discussion.id, discussion.html_url, discussion.message)
-        resources.append(d)
-
-fetch_content()
-
-for resource in resources:
-    resource.get_content()
-    media, success = parser.parse_content(resource.content)
-
-    if success:
-        print(resource.full_url)
-
-import pdb; pdb.set_trace()
+for resource in RESOURCES:
+    content = resource.fetch()
+    media, success = resource.parse()
+    import pdb; pdb.set_trace()
