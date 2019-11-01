@@ -3,7 +3,7 @@ from pprint import pprint
 
 
 # Canvas API Key
-api_key = '1158~Bx1S5uoZ3gPIt4MCgkVkSIGNin1wpAdunFZ7rUC8cRCUzg9G2eWDMMCj9HYNpy5E'
+api_key = ''
 # Canvas URL e.g. https://example.instructure.com
 api_url = 'https://webcourses2c.test.instructure.com'
 
