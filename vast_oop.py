@@ -1,3 +1,5 @@
+
+from bs4 import BeautifulSoup
 from canvasapi import Canvas
 from collections import namedtuple
 from pprint import pprint
@@ -15,7 +17,7 @@ course = canvas.get_course(course_id)
 class ResourceProvider:
     def __init__(self, enabled = True):
         self.enabled = enabled
-
+        
     def fetch(self):
         if not self.enabled:
             return
@@ -27,7 +29,11 @@ class ResourceProvider:
         if not self.function:
             raise Exception('Service has no function.')
 
-        items = self.function()
+        if hasattr(self, 'kwargs'):
+            items = self.function(**self.kwargs)
+        else:
+            items = self.function()
+
         content = []
         for item in items:
             content.append((
@@ -42,17 +48,14 @@ class SyllabusService(ResourceProvider):
     def get_resources(self):
         syllabus = canvas.get_course(course_id, include='syllabus_body')
         url = '{}/courses/{}/assignments/syllabus'.format(api_url, course_id)
-        return (syllabus.syllabus_body, url)
+        return [(syllabus.syllabus_body, url)]
 
 
 class AnnouncementService(ResourceProvider):
-    def get_resources(self):
-        announcements = course.get_discussion_topics(only_announcements=True)
-        content = []
-        for announcement in announcements:
-            content.append((announcement.message, announcement.html_url))
-        return content
-        
+    function = course.get_discussion_topics
+    field = "message"
+    kwargs = {'only_announcements': 'True'}
+
 
 class ModuleService(ResourceProvider):
     def get_resources(self):
@@ -80,20 +83,59 @@ class PageService(ResourceProvider):
         pages = course.get_pages()
         content = []
         for page in pages:
-            content.append((course.get_page(page.url), page.html_url))
+            p = course.get_page(page.url)
+            content.append((p.body, page.html_url))
         return content
 
+class Parser:
+    def csv_writer(self, *args):
+        pprint(args)
+        print('------------------------------------------')
+        # write to csv
+
+    def parse_content(self, tuple):
+        soup = BeautifulSoup(tuple[0], 'html.parser')
+        # Collect all hrefs from any anchor tag
+        for link in soup.find_all('a'):
+            # Check if the link is an internal Canvas file
+            if link.has_attr('data-api-endpoint'):
+                file_id = link.get('data-api-endpoint')
+                file = course.get_file(file_id.split('/')[-1])
+                self.csv_writer(
+                    'Course file: {}'.format(file.display_name),
+                    'No captioning data found',
+                    '',
+                    '{}'.format(tuple[1])
+                )
+
+    def media_check(self, link):
+        pass
+        
+
+        #   - Check for linked media files (data-api-endpoint)
+        #   - Check for youtube link
+        #   - Check for vimeo link
+        #   - Check for any library links
+        #   - Check for iframe media
+        #   - Check for embedded video
+        #   - Check for embedded audio
 
 RESOURCES = [
-    SyllabusService(enabled = True),
+    SyllabusService(enabled = False),
     AnnouncementService(enabled = False),
     ModuleService(enabled = False),
     AssignmentService(enabled = False),
     DiscussionService(enabled = False),
-    PageService(enabled = False)
+    PageService(enabled = True)
 ]
+
+parser = Parser()
 
 for resource in RESOURCES:
     content = resource.fetch()
-    # media, success = resource.parse()
-    import pdb; pdb.set_trace()
+
+    if content is not None:
+        for tuple in content:
+            parser.parse_content(tuple)
+
+    # media, success = resource.parse(
