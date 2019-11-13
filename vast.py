@@ -3,14 +3,15 @@ from bs4 import BeautifulSoup
 from pprint import pprint
 import re
 import requests
+
 from resources import SyllabusService, AnnouncementService, ModuleService, AssignmentService, DiscussionService, PageService
 
 youtube_api_key = ''
 youtube_playlist_pattern = r'[?&]list=([^#\&\?\s]+)'  # noqa
 youtube_pattern = r'(?:https?:\/\/)?(?:[0-9A-Z-]+\.)?(?:youtube|youtu|youtube-nocookie)\.(?:com|be)\/(?:watch\?v=|watch\?.+&v=|embed\/|v\/|.+\?v=)?([^&=\n%\?]{11})'  # noqa
 vimeo_pattern = r'(http|https)?:\/\/(www\.|player\.)?vimeo.com\/(?:channels\/(?:\w+\/)?|video\/(?:\w+\/)?|groups\/([^\/]*)\/videos\/|)(\d+)(?:|\/\?)'  # noqa
+vimeo_access_token = ''
 lib_media_urls = ['fod.infobase.com', 'search.alexanderstreet.com', 'kanopystreaming-com']
-
 
 class Parser:
     def parse_content(self, content_pair, flat):
@@ -62,7 +63,8 @@ class Parser:
                         to_check.append({
                             'type': media_type,
                             'link_loc': content_pair[1],
-                            'media_loc': src
+                            'media_loc': src,
+                            'captions': []
                         })
                     else:
                         no_check.append({
@@ -77,7 +79,8 @@ class Parser:
                 to_check.append({
                     'type': media_type,
                     'link_loc': content_pair[1],
-                    'media_loc': content_pair[0]
+                    'media_loc': content_pair[0],
+                    'captions': []
                 })
             else:
                 no_check.append({
@@ -127,10 +130,7 @@ for resource in RESOURCES:
         # If not flat then each pair is simply a link and a location
         parser.parse_content(content_pair, flat)
 
-import pdb; pdb.set_trace()
-
 # Validate that the media links contain captions
-
 for link in to_check:
     if link['type'] == 'youtube':
         match = re.search(youtube_pattern, link['media_loc'])
@@ -139,11 +139,48 @@ for link in to_check:
             'https://www.googleapis.com/youtube/v3/captions?part=snippet&videoId={}&key={}'
             .format(video_id, youtube_api_key)
         )
-        response = r.json()
-        for item in response['items']:
-            item['snippet']
-            import pdb; pdb.set_trace()
-            
-        
 
+        if r.status_code == 404:
+            link['captions'].append('Improper link to video')
+            continue
+
+        response = r.json()
+
+        try:
+            for item in response['items']:
+                if item['snippet']['language'] == 'en':
+                    if item['snippet']['trackKind'] == 'ASR':
+                        link['captions'].append('automated english')
+                    if item['snippet']['trackKind'] == 'standard':
+                        link['captions'].append('english')
+                elif item['snippet']['language']:
+                    link['captions'].append(item['snippet']['language'])
+        except:
+            print('Passing because of no items in response')
+        
+    if link['type'] == 'vimeo':
+        match = re.search(vimeo_pattern, link['media_loc'])
+        video_id = match.group(4)
+        r = requests.get(
+            'https://api.vimeo.com/videos/{}/texttracks'.format(video_id),
+            headers={'Authorization': 'bearer {}'.format(vimeo_access_token)}
+        )
+
+        if r.status_code == 404:
+            link['captions'].append('Improper link to video')
+            continue
+
+        response = r.json()
+        
+        try:
+            for item in response['data']:
+                if item['language'] == 'en':
+                    link['captions'].append('english')
+                elif item['language']:
+                    link['captions'].append(item['language'])
+        except:
+            pass
+
+
+import pdb; pdb.set_trace()
 # Generate a report with that data
