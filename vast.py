@@ -2,8 +2,10 @@
 from bs4 import BeautifulSoup
 from pprint import pprint
 import re
+import requests
 from resources import SyllabusService, AnnouncementService, ModuleService, AssignmentService, DiscussionService, PageService
 
+youtube_api_key = ''
 youtube_playlist_pattern = r'[?&]list=([^#\&\?\s]+)'  # noqa
 youtube_pattern = r'(?:https?:\/\/)?(?:[0-9A-Z-]+\.)?(?:youtube|youtu|youtube-nocookie)\.(?:com|be)\/(?:watch\?v=|watch\?.+&v=|embed\/|v\/|.+\?v=)?([^&=\n%\?]{11})'  # noqa
 vimeo_pattern = r'(http|https)?:\/\/(www\.|player\.)?vimeo.com\/(?:channels\/(?:\w+\/)?|video\/(?:\w+\/)?|groups\/([^\/]*)\/videos\/|)(\d+)(?:|\/\?)'  # noqa
@@ -128,5 +130,20 @@ for resource in RESOURCES:
 import pdb; pdb.set_trace()
 
 # Validate that the media links contain captions
+
+for link in to_check:
+    if link['type'] == 'youtube':
+        match = re.search(youtube_pattern, link['media_loc'])
+        video_id = match.group(1)
+        r = requests.get(
+            'https://www.googleapis.com/youtube/v3/captions?part=snippet&videoId={}&key={}'
+            .format(video_id, youtube_api_key)
+        )
+        response = r.json()
+        for item in response['items']:
+            item['snippet']
+            import pdb; pdb.set_trace()
+            
+        
 
 # Generate a report with that data

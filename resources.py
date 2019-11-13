@@ -1,7 +1,7 @@
 from canvasapi import Canvas
 
 # Canvas API Key
-api_key = '1158~CElid5nGPo5n2kgLujNn8NQaO8XaR35Zb2ZQvaJX9UaArbIGaEYqF5Mc44X3JvcN'
+api_key = ''
 # Canvas URL e.g. https://example.instructure.com
 api_url = 'https://webcourses2c.test.instructure.com'
 
